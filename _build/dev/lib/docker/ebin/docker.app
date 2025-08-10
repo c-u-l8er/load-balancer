@@ -1,0 +1,10 @@
+{application,docker,
+             [{applications,[kernel,stdlib,elixir,logger,jason,tesla,hackney]},
+              {description,"Elixir client for the Docker Remote API.\n"},
+              {modules,['Elixir.Docker','Elixir.Docker.Auth',
+                        'Elixir.Docker.ChunkedJson','Elixir.Docker.Client',
+                        'Elixir.Docker.Config','Elixir.Docker.Containers',
+                        'Elixir.Docker.Images','Elixir.Docker.Misc',
+                        'Elixir.Docker.Names']},
+              {registered,[]},
+              {vsn,"0.4.0"}]}.

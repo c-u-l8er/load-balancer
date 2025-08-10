@@ -1,0 +1,14 @@
+{
+  "name": "load-balancer-assets",
+  "version": "1.0.0",
+  "description": "Assets for Load Balancer Phoenix application",
+  "scripts": {
+    "build": "esbuild js/app.js --bundle --minify --target=es2017 --outdir=../priv/static/assets --external:/fonts/* --external:/images/* --external:phoenix --external:phoenix_live_view",
+    "build:css": "tailwindcss -i ./css/app.css -o ../priv/static/assets/app.css --watch",
+    "build:js": "esbuild js/app.js --bundle --minify --target=es2017 --outdir=../priv/static/assets --external:/fonts/* --external:/images/* --external:phoenix --external:phoenix_live_view --watch"
+  },
+  "devDependencies": {
+    "esbuild": "^0.19.0",
+    "tailwindcss": "^3.3.0"
+  }
+}
