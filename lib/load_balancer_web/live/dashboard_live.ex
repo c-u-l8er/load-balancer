@@ -176,7 +176,12 @@ defmodule LoadBalancerWeb.DashboardLive do
                       "px-2 py-1 rounded-full text-xs font-medium",
                       case container.health do
                         "healthy" -> "bg-green-500/20 text-green-400"
+                        "running" -> "bg-blue-500/20 text-blue-400"
+                        "starting" -> "bg-yellow-500/20 text-yellow-400"
                         "unhealthy" -> "bg-red-500/20 text-red-400"
+                        "stopped" -> "bg-gray-500/20 text-gray-400"
+                        "exited" -> "bg-red-500/20 text-red-400"
+                        "paused" -> "bg-orange-500/20 text-orange-400"
                         _ -> "bg-yellow-500/20 text-yellow-400"
                       end
                     ]}>
@@ -233,60 +238,46 @@ defmodule LoadBalancerWeb.DashboardLive do
   # Private helper functions
 
   defp fetch_domains() do
-    case HTTPoison.get("http://localhost:4000/api/routes") do
-      {:ok, %{status_code: 200, body: body}} ->
-        case Jason.decode(body) do
-          {:ok, %{"routes" => routes}} ->
-            Enum.map(routes, fn route ->
-              %{
-                domain: route["domain"],
-                containers: route["containers"],
-                strategy: route["strategy"],
-                health_check: route["health_check"],
-                status: route["status"]
-              }
-            end)
-          _ -> []
-        end
-      _ -> []
-    end
+    # Call the domain store directly instead of making HTTP requests
+    LoadBalancer.DomainStore.get_all_domains()
   end
 
   defp fetch_containers() do
-    case HTTPoison.get("http://localhost:4000/api/containers") do
-      {:ok, %{status_code: 200, body: body}} ->
-        case Jason.decode(body) do
-          {:ok, %{"containers" => containers}} ->
-            Enum.map(containers, fn container ->
-              %{
-                name: container["name"],
-                status: container["status"],
-                ports: container["ports"],
-                health: container["health"]
-              }
-            end)
-          _ -> []
-        end
-      _ -> []
+    # Get containers directly from ContainerManager
+    case LoadBalancer.ContainerManager.get_containers() do
+      containers when is_list(containers) ->
+        Enum.map(containers, fn container ->
+          %{
+            name: container.name,
+            status: Atom.to_string(container.status),
+            ports: container.endpoint,
+            health: case container.status do
+              :healthy -> "healthy"
+              :running -> "running"
+              :starting -> "starting"
+              :unhealthy -> "unhealthy"
+              :stopped -> "stopped"
+              :exited -> "exited"
+              :paused -> "paused"
+              _ -> "unknown"
+            end
+          }
+        end)
+      _ ->
+        []
     end
   end
 
   defp fetch_metrics() do
-    case HTTPoison.get("http://localhost:4000/api/metrics") do
-      {:ok, %{status_code: 200, body: body}} ->
-        case Jason.decode(body) do
-          {:ok, metrics} ->
-            %{
-              response_time: metrics["response_time"] || 0,
-              error_rate: metrics["error_rate"] || 0,
-              throughput: metrics["throughput"] || 0,
-              active_connections: metrics["active_connections"] || 0,
-              containers: metrics["containers"] || %{},
-              domains: metrics["domains"] || %{}
-            }
-          _ -> %{}
-        end
-      _ -> %{}
-    end
+    # For now, return default metrics since we don't have a metrics store yet
+    # TODO: Implement metrics collection and storage
+    %{
+      response_time: 0,
+      error_rate: 0,
+      throughput: 0,
+      active_connections: 0,
+      containers: %{},
+      domains: %{}
+    }
   end
 end

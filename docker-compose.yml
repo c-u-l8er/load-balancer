@@ -11,6 +11,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro  # Docker socket access
       - ./certs:/etc/ssl/certs:ro  # SSL certificates
       - ./config:/app/config:ro  # Configuration files
+      - ./data:/app/data  # Domain data persistence
     environment:
       - LOAD_BALANCER_PORT=8080
       - LOAD_BALANCER_WEB_PORT=4000
@@ -18,6 +19,7 @@ services:
       - LOAD_BALANCER_LOG_LEVEL=info
       - DOCKER_HOST=unix:///var/run/docker.sock
       - SECRET_KEY_BASE=GnxSXgDYykilzlTlmuLmg8kmeW+e7wvDvNKfIoHnLkDOfinAX1cuEeitZ4Ae3UJAhZZJim+Bws6Zen352o2fTQ==
+      - DOMAIN_DATA_PATH=/app/data/domains.json
     networks:
       - myapp-network  # Use your existing network
       - load-balancer-network

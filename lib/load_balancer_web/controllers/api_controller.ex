@@ -30,7 +30,7 @@ defmodule LoadBalancerWeb.ApiController do
         conn
         |> put_status(:created)
         |> json(%{message: "Domain created successfully", domain: domain})
-      
+
       {:error, message} ->
         conn
         |> put_status(:bad_request)
@@ -54,7 +54,7 @@ defmodule LoadBalancerWeb.ApiController do
         conn
         |> put_status(:ok)
         |> json(%{message: "Domain updated successfully", domain: domain})
-      
+
       {:error, message} ->
         conn
         |> put_status(:bad_request)
@@ -69,7 +69,7 @@ defmodule LoadBalancerWeb.ApiController do
         conn
         |> put_status(:ok)
         |> json(%{message: "Domain deleted successfully", domain: domain_name})
-      
+
       {:error, message} ->
         conn
         |> put_status(:not_found)
@@ -186,25 +186,25 @@ defmodule LoadBalancerWeb.ApiController do
     cond do
       is_nil(domain_data.domain) or domain_data.domain == "" ->
         {:error, "Domain name is required"}
-      
+
       is_nil(domain_data.containers) or domain_data.containers == [] ->
         {:error, "At least one container is required"}
-      
+
       is_nil(domain_data.strategy) or domain_data.strategy == "" ->
         {:error, "Load balancing strategy is required"}
-      
+
       is_nil(domain_data.health_check) or domain_data.health_check == "" ->
         {:error, "Health check path is required"}
-      
+
       is_nil(domain_data.status) or domain_data.status == "" ->
         {:error, "Status is required"}
-      
+
       not Enum.member?(["round_robin", "least_connections", "ip_hash", "weighted_round_robin"], domain_data.strategy) ->
         {:error, "Invalid load balancing strategy"}
-      
+
       not Enum.member?(["active", "inactive", "maintenance"], domain_data.status) ->
         {:error, "Invalid status value"}
-      
+
       true ->
         :ok
     end

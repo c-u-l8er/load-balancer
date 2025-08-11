@@ -73,6 +73,38 @@ LoadBalancer.Application
    mix run --no-halt
    ```
 
+## Docker Deployment
+
+### Prerequisites
+- Docker
+- Docker Compose
+
+### Quick Start
+
+1. **Build and start the services**
+   ```bash
+   docker-compose up -d
+   ```
+
+2. **Access the management interface**
+   - Web Dashboard: http://localhost:4001
+   - Load Balancer: http://localhost:8080
+
+3. **Domain data persistence**
+   - Domain configurations are stored in `./data/domains.json`
+   - This directory is mounted as a volume in the container
+   - Data persists across container restarts
+
+### Configuration
+
+The Docker setup includes:
+- **Load Balancer**: Main application on port 8080
+- **Web Management**: Phoenix interface on port 4001
+- **Example Apps**: Two nginx containers for testing
+- **Data Persistence**: Mounted `./data` directory for domain storage
+- **SSL Support**: Mounted `./certs` directory for certificates
+- **Docker Socket**: Access to manage containers
+
 ## Configuration
 
 The load balancer uses a powerful macro system for configuration. Here's how to define domain routes:

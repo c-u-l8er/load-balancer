@@ -3,10 +3,10 @@ defmodule LoadBalancer.DomainPersistence do
   Handles persistence of domain configurations to/from JSON files.
   This allows the ETS-based domain store to survive application restarts.
   """
-  
+
   require Logger
 
-  @data_file "priv/domains.json"
+  @data_file System.get_env("DOMAIN_DATA_PATH") || "data/domains.json"
 
   @doc """
   Saves all domains from the domain store to a JSON file.
@@ -14,8 +14,10 @@ defmodule LoadBalancer.DomainPersistence do
   """
   def save_domains do
     domains = LoadBalancer.DomainStore.get_all_domains()
+    Logger.info("Saving #{length(domains)} domains to #{@data_file}")
+    Logger.info("Domains to save: #{inspect(domains)}")
 
-    # Ensure the priv directory exists
+    # Ensure the data directory exists
     File.mkdir_p(Path.dirname(@data_file))
 
     # Convert domains to a serializable format
@@ -28,6 +30,8 @@ defmodule LoadBalancer.DomainPersistence do
         status: domain.status
       }
     end)
+
+    Logger.info("Serializable domains: #{inspect(serializable_domains)}")
 
     case File.write(@data_file, Jason.encode!(serializable_domains, pretty: true)) do
       :ok ->
@@ -44,6 +48,7 @@ defmodule LoadBalancer.DomainPersistence do
   Called during application startup.
   """
   def load_domains do
+    Logger.info("Attempting to load domains from: #{@data_file}")
     case File.read(@data_file) do
       {:ok, content} ->
         case Jason.decode(content) do
@@ -54,9 +59,9 @@ defmodule LoadBalancer.DomainPersistence do
             # Load each domain
             loaded_count = Enum.reduce_while(domains, 0, fn domain_data, count ->
                                case LoadBalancer.DomainStore.add_domain(domain_data) do
-                   {:ok, _domain} -> 
+                   {:ok, _domain} ->
                      {:cont, count + 1}
-                 {:error, reason} -> 
+                 {:error, reason} ->
                    Logger.warn("Failed to load domain #{domain_data["domain"]}: #{reason}")
                    {:cont, count}
                end

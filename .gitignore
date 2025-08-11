@@ -1,0 +1,30 @@
+# Elixir build artifacts
+_build/
+deps/
+*.ez
+
+# Environment files
+.env
+.env.local
+
+# Logs
+*.log
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Docker
+.dockerignore

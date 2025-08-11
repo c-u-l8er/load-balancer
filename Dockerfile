@@ -54,7 +54,7 @@ WORKDIR /app
 COPY --from=0 /app/_build/prod/rel/load_balancer ./
 
 # Create necessary directories
-RUN mkdir -p /app/config /app/certs && \
+RUN mkdir -p /app/config /app/certs /app/data && \
     chown -R app:app /app
 
 # Switch to app user

@@ -1,5 +1,6 @@
 defmodule LoadBalancerWeb.ContainersLive do
   use LoadBalancerWeb, :live_view
+  require Logger
 
   def mount(_params, _session, socket) do
     if connected?(socket) do
@@ -59,9 +60,21 @@ defmodule LoadBalancerWeb.ContainersLive do
           </div>
 
           <div class="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 text-center">
-            <div class="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center mx-auto mb-4">
+            <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center mx-auto mb-4">
               <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
+            <div class="text-2xl font-bold text-white">
+              <%= @containers |> Enum.filter(&(&1["health"] == "running")) |> length() %>
+            </div>
+            <div class="text-sm text-gray-300">Running</div>
+          </div>
+
+          <div class="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 text-center">
+            <div class="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center mx-auto mb-4">
+              <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 0 4 4m4-4l-4-4"></path>
               </svg>
             </div>
             <div class="text-2xl font-bold text-white">
@@ -71,27 +84,15 @@ defmodule LoadBalancerWeb.ContainersLive do
           </div>
 
           <div class="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 text-center">
-            <div class="w-12 h-12 bg-gradient-to-br from-yellow-500 to-orange-600 rounded-xl flex items-center justify-center mx-auto mb-4">
-              <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-              </svg>
-            </div>
-            <div class="text-2xl font-bold text-white">
-              <%= @containers |> Enum.filter(&(&1["health"] == "unknown")) |> length() %>
-            </div>
-            <div class="text-sm text-gray-300">Unknown</div>
-          </div>
-
-          <div class="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 text-center">
             <div class="w-12 h-12 bg-gradient-to-br from-red-500 to-pink-600 rounded-xl flex items-center justify-center mx-auto mb-4">
               <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
               </svg>
             </div>
             <div class="text-2xl font-bold text-white">
-              <%= @containers |> Enum.filter(&(&1["health"] == "unhealthy")) |> length() %>
+              <%= @containers |> Enum.filter(&(&1["health"] in ["stopped", "exited", "unhealthy"])) |> length() %>
             </div>
-            <div class="text-sm text-gray-300">Unhealthy</div>
+            <div class="text-sm text-gray-300">Stopped/Error</div>
           </div>
         </div>
 
@@ -139,7 +140,12 @@ defmodule LoadBalancerWeb.ContainersLive do
                           "w-3 h-3 rounded-full",
                           case container["health"] do
                             "healthy" -> "bg-green-400"
+                            "running" -> "bg-blue-400"
+                            "starting" -> "bg-yellow-400"
                             "unhealthy" -> "bg-red-400"
+                            "stopped" -> "bg-gray-400"
+                            "exited" -> "bg-red-400"
+                            "paused" -> "bg-orange-400"
                             _ -> "bg-yellow-400"
                           end
                         ]}></div>
@@ -166,7 +172,12 @@ defmodule LoadBalancerWeb.ContainersLive do
                           "px-2 py-1 rounded-full text-xs font-medium",
                           case container["health"] do
                             "healthy" -> "bg-green-500/20 text-green-400"
+                            "running" -> "bg-blue-500/20 text-blue-400"
+                            "starting" -> "bg-yellow-500/20 text-yellow-400"
                             "unhealthy" -> "bg-red-500/20 text-red-400"
+                            "stopped" -> "bg-gray-500/20 text-gray-400"
+                            "exited" -> "bg-red-500/20 text-red-400"
+                            "paused" -> "bg-orange-500/20 text-orange-400"
                             _ -> "bg-yellow-500/20 text-yellow-400"
                           end
                         ]}>
@@ -209,13 +220,35 @@ defmodule LoadBalancerWeb.ContainersLive do
   # Private helper functions
 
   defp fetch_containers() do
-    case HTTPoison.get("http://localhost:4000/api/containers") do
-      {:ok, %{status_code: 200, body: body}} ->
-        case Jason.decode(body) do
-          {:ok, %{"containers" => containers}} -> containers
-          _ -> []
-        end
-      _ -> []
+    # Get containers from the ContainerManager
+    Logger.info("Fetching containers from ContainerManager...")
+
+    case LoadBalancer.ContainerManager.get_containers() do
+      containers when is_list(containers) ->
+        Logger.info("Got containers list with #{length(containers)} containers")
+        # Convert the container structs to a map format for the UI
+        Enum.map(containers, fn container ->
+          %{
+            "name" => container.name,
+            "status" => Atom.to_string(container.status),
+            "health" => case container.status do
+              :healthy -> "healthy"
+              :unhealthy -> "unhealthy"
+              :starting -> "starting"
+              :stopped -> "stopped"
+              :running -> "running"
+              :paused -> "paused"
+              :exited -> "exited"
+              :created -> "created"
+              _ -> "unknown"
+            end,
+            "ports" => container.endpoint,
+            "connection_count" => container.connection_count || 0
+          }
+        end)
+      other ->
+        Logger.warn("Unexpected containers format: #{inspect(other)}")
+        []
     end
   end
 end

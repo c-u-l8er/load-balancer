@@ -89,6 +89,8 @@ defmodule LoadBalancer.ContainerManager do
     # Initialize Docker connection
     case init_docker_connection() do
       :ok ->
+        # Schedule container discovery after startup to avoid deadlock
+        Process.send_after(self(), :discover_containers, 1000)
         schedule_health_checks()
         {:ok, %State{}}
 
@@ -187,7 +189,7 @@ defmodule LoadBalancer.ContainerManager do
         new_state = %{state | containers: Map.put(state.containers, name, updated_container)}
 
         if status == :unhealthy do
-          Logger.warning("Container #{name} is unhealthy")
+          Logger.warn("Container #{name} is unhealthy")
         end
 
         {:noreply, new_state}
@@ -218,28 +220,169 @@ defmodule LoadBalancer.ContainerManager do
     Process.send_after(self(), :perform_health_checks, 30_000)
   end
 
-  defp perform_health_check(container) do
-    try do
-      # Perform HTTP health check
-      case HTTPoison.get(container.health_check_url, [], timeout: 5000) do
-        {:ok, %{status_code: status_code}} when status_code in 200..299 ->
-          send(__MODULE__, {:health_check_result, container.name, true})
+  defp schedule_container_discovery do
+    Process.send_after(self(), :discover_containers, 30_000)
+  end
 
-        _ ->
-          send(__MODULE__, {:health_check_result, container.name, false})
+  defp perform_health_check(container) do
+    Logger.info("Checking Docker status for container: #{container.name}")
+
+    try do
+      # Query Docker for container status
+      case get_docker_container_status(container.name) do
+        {:ok, status, health} ->
+          Logger.info("Docker status for #{container.name}: #{status}, health: #{health}")
+          send(__MODULE__, {:health_check_result, container.name, {status, health}})
+
+        {:error, reason} ->
+          Logger.warn("Failed to get Docker status for #{container.name}: #{reason}")
+          send(__MODULE__, {:health_check_result, container.name, {:unknown, :unknown}})
       end
     rescue
-      _ ->
-        send(__MODULE__, {:health_check_result, container.name, false})
+      error ->
+        Logger.warn("Docker status check for #{container.name} crashed with error: #{inspect(error)}")
+        send(__MODULE__, {:health_check_result, container.name, {:unknown, :unknown}})
     end
+  end
+
+  defp get_docker_container_status(container_name) do
+    # Use Docker CLI to get container status
+    Logger.info("Getting Docker status for container: #{container_name}")
+    
+    case System.cmd("docker", ["inspect", "--format", "{{.State.Status}}", container_name]) do
+      {status, 0} ->
+        status = String.trim(status)
+        Logger.info("Docker status for #{container_name}: #{status}")
+
+        # Also get health status if available
+        case System.cmd("docker", ["inspect", "--format", "{{.State.Health.Status}}", container_name]) do
+          {health, 0} ->
+            health = String.trim(health)
+            Logger.info("Docker health for #{container_name}: #{health}")
+            {:ok, status, health}
+          {health, exit_code} ->
+            Logger.warn("Health check failed for #{container_name}, exit code: #{exit_code}, output: #{health}")
+            {:ok, status, "none"}
+        end
+
+      {error, exit_code} ->
+        Logger.error("Status check failed for #{container_name}, exit code: #{exit_code}, output: #{error}")
+        {:error, "Container not found or error: #{error}"}
+    end
+  end
+
+  # Handle health check results from Tasks
+  def handle_info({ref, {:health_check_result, name, result}}, state) when is_reference(ref) do
+    # This is a Task result, handle it the same way
+    handle_health_check_result(name, result, state)
+  end
+
+  def handle_info({:health_check_result, name, result}, state) do
+    # This is a direct message, handle it
+    handle_health_check_result(name, result, state)
+  end
+
+  # Handle Task completion messages (normal behavior)
+  def handle_info({:DOWN, _ref, :process, _pid, _reason}, state) do
+    # Task completed normally, ignore this message
+    {:noreply, state}
+  end
+
+  # Helper function to handle health check results
+  defp handle_health_check_result(name, {docker_status, docker_health}, state) do
+    case Map.get(state.containers, name) do
+      nil -> {:noreply, state}
+
+      container ->
+        # Map Docker status to our internal status
+        Logger.info("Mapping Docker status for #{name}: #{docker_status}, health: #{docker_health}")
+        
+        status = case docker_status do
+          "running" ->
+            case docker_health do
+              "healthy" -> :healthy
+              "unhealthy" -> :unhealthy
+              "starting" -> :starting
+              _ -> :running
+            end
+          "exited" -> :stopped
+          "created" -> :starting
+          "paused" -> :paused
+          _ -> :unknown
+        end
+        
+        Logger.info("Mapped status for #{name}: #{docker_status} -> #{status}")
+
+        updated_container = %{container |
+          status: status,
+          last_health_check: DateTime.utc_now()
+        }
+
+        new_state = %{state | containers: Map.put(state.containers, name, updated_container)}
+
+        Logger.info("Updated container #{name} status to #{status} (Docker: #{docker_status}, Health: #{docker_health})")
+
+        {:noreply, new_state}
+    end
+  end
+
+  # Handle container discovery message
+  def handle_info(:discover_containers, state) do
+    Logger.info("Starting container discovery...")
+
+    # Register containers directly in the state instead of calling the public API
+    # We'll get real status from Docker, not HTTP health checks
+    containers = %{
+      "web-app-1" => %Container{
+        name: "web-app-1",
+        endpoint: "http://web-app-1:80",
+        status: :starting,
+        health_check_url: "http://web-app-1:80", # Keep for compatibility
+        last_health_check: nil,
+        connection_count: 0,
+        metadata: %{}
+      },
+      "web-app-2" => %Container{
+        name: "web-app-2",
+        endpoint: "http://web-app-2:80",
+        status: :starting,
+        health_check_url: "http://web-app-2:80", # Keep for compatibility
+        last_health_check: nil,
+        connection_count: 0,
+        metadata: %{}
+      },
+      "load-balancer" => %Container{
+        name: "load-balancer",
+        endpoint: "http://localhost:8080",
+        status: :starting,
+        health_check_url: "http://localhost:8080/health", # Keep for compatibility
+        last_health_check: nil,
+        connection_count: 0,
+        metadata: %{}
+      }
+    }
+
+    new_state = %{state | containers: containers}
+
+    Logger.info("Container discovery completed - registered #{map_size(containers)} containers")
+
+    # Trigger immediate health checks for all containers
+    Enum.each(containers, fn {_name, container} ->
+      Task.async(fn -> perform_health_check(container) end)
+    end)
+
+    # Schedule next discovery
+    schedule_container_discovery()
+
+    {:noreply, new_state}
   end
 
   @doc """
   Discovers running Docker containers automatically.
+  This function is deprecated - use the async discovery via messages instead.
   """
   def discover_containers do
-    # This would integrate with Docker API to discover running containers
-    # For now, return empty list
+    Logger.warn("discover_containers/0 is deprecated - use async discovery instead")
     []
   end
 

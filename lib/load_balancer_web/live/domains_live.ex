@@ -28,7 +28,9 @@ defmodule LoadBalancerWeb.DomainsLive do
   end
 
   def handle_info(:update_domains, socket) do
+    Logger.info("Received :update_domains message")
     domains = fetch_domains()
+    Logger.info("Fetched domains: #{inspect(domains)}")
     {:noreply, assign(socket, domains: domains, loading: false)}
   end
 
@@ -98,9 +100,10 @@ defmodule LoadBalancerWeb.DomainsLive do
       true ->
                          case create_domain(form_data) do
                    {:ok, _} ->
-                     domains = fetch_domains()
                      # Auto-save domains to disk
                      LoadBalancer.DomainPersistence.save_domains()
+                     # Refresh domains from store
+                     domains = LoadBalancer.DomainStore.get_all_domains()
                      {:noreply, assign(socket,
                        domains: domains,
                        show_add_form: false,
@@ -142,9 +145,10 @@ defmodule LoadBalancerWeb.DomainsLive do
       true ->
                          case update_domain(socket.assigns.editing_domain.domain, form_data) do
                    {:ok, _} ->
-                     domains = fetch_domains()
                      # Auto-save domains to disk
                      LoadBalancer.DomainPersistence.save_domains()
+                     # Refresh domains from store
+                     domains = LoadBalancer.DomainStore.get_all_domains()
                      {:noreply, assign(socket,
                        domains: domains,
                        show_edit_form: false,
@@ -159,10 +163,11 @@ defmodule LoadBalancerWeb.DomainsLive do
   def handle_event("delete_domain", %{"domain" => domain_name}, socket) do
     case delete_domain(domain_name) do
       {:ok, _} ->
-        domains = fetch_domains()
         # Auto-save domains to disk
         LoadBalancer.DomainPersistence.save_domains()
-        {:noreply, put_flash(socket, :info, "Domain deleted successfully")}
+        # Refresh domains from store
+        domains = LoadBalancer.DomainStore.get_all_domains()
+        {:noreply, assign(socket, domains: domains) |> put_flash(:info, "Domain deleted successfully")}
       {:error, message} ->
         {:noreply, put_flash(socket, :error, "Failed to delete domain: #{message}")}
     end
@@ -180,7 +185,8 @@ defmodule LoadBalancerWeb.DomainsLive do
   def handle_event("reload_domains", _params, socket) do
     case LoadBalancer.DomainPersistence.load_domains() do
       {:ok, count} ->
-        domains = fetch_domains()
+        # Refresh domains from store after reloading from disk
+        domains = LoadBalancer.DomainStore.get_all_domains()
         {:noreply, assign(socket, domains: domains) |> put_flash(:info, "Successfully reloaded #{count} domains from disk")}
       {:error, message} ->
         {:noreply, put_flash(socket, :error, "Failed to reload domains: #{message}")}
@@ -591,26 +597,16 @@ defmodule LoadBalancerWeb.DomainsLive do
   # Private helper functions
 
   defp fetch_domains() do
-    case HTTPoison.get("http://localhost:4000/api/routes") do
-      {:ok, %{status_code: 200, body: body}} ->
-        case Jason.decode(body) do
-          {:ok, %{"routes" => routes}} ->
-            Enum.map(routes, fn route ->
-              %{
-                domain: route["domain"],
-                containers: route["containers"],
-                strategy: route["strategy"],
-                health_check: route["health_check"],
-                status: route["status"]
-              }
-            end)
-          _ -> []
-        end
-      _ -> []
-    end
+    # Call the domain store directly instead of making HTTP requests
+    Logger.info("Fetching domains directly from DomainStore")
+    domains = LoadBalancer.DomainStore.get_all_domains()
+    Logger.info("Retrieved #{length(domains)} domains from store: #{inspect(domains)}")
+    domains
   end
 
   defp create_domain(form_data) do
+    Logger.info("Creating domain with form data: #{inspect(form_data)}")
+    
     containers = form_data["containers"]
     |> String.split(",")
     |> Enum.map(&String.trim/1)
@@ -624,15 +620,16 @@ defmodule LoadBalancerWeb.DomainsLive do
       status: form_data["status"]
     }
 
-    case HTTPoison.post("http://localhost:4000/api/routes", Jason.encode!(domain_data), [{"Content-Type", "application/json"}]) do
-      {:ok, %{status_code: 201}} -> {:ok, "Domain created successfully"}
-      {:ok, %{status_code: 200}} -> {:ok, "Domain created successfully"}
-      {:ok, %{status_code: status_code, body: body}} ->
-        case Jason.decode(body) do
-          {:ok, %{"message" => message}} -> {:error, message}
-          _ -> {:error, "Failed to create domain (HTTP #{status_code})"}
-        end
-      {:error, reason} -> {:error, "Network error: #{reason}"}
+    Logger.info("Processed domain data: #{inspect(domain_data)}")
+
+    # Call the domain store directly
+    case LoadBalancer.DomainStore.add_domain(domain_data) do
+      {:ok, domain} -> 
+        Logger.info("Domain created successfully: #{inspect(domain)}")
+        {:ok, "Domain created successfully"}
+      {:error, reason} -> 
+        Logger.error("Failed to create domain: #{reason}")
+        {:error, reason}
     end
   end
 
@@ -650,27 +647,18 @@ defmodule LoadBalancerWeb.DomainsLive do
       status: form_data["status"]
     }
 
-    case HTTPoison.put("http://localhost:4000/api/routes/#{domain_name}", Jason.encode!(domain_data), [{"Content-Type", "application/json"}]) do
-      {:ok, %{status_code: 200}} -> {:ok, "Domain updated successfully"}
-      {:ok, %{status_code: status_code, body: body}} ->
-        case Jason.decode(body) do
-          {:ok, %{"message" => message}} -> {:error, message}
-          _ -> {:error, "Failed to update domain (HTTP #{status_code})"}
-        end
-      {:error, reason} -> {:error, "Network error: #{reason}"}
+    # Call the domain store directly
+    case LoadBalancer.DomainStore.update_domain(domain_name, domain_data) do
+      {:ok, domain} -> {:ok, "Domain updated successfully"}
+      {:error, reason} -> {:error, reason}
     end
   end
 
   defp delete_domain(domain_name) do
-    case HTTPoison.delete("http://localhost:4000/api/routes/#{domain_name}") do
-      {:ok, %{status_code: 200}} -> {:ok, "Domain deleted successfully"}
-      {:ok, %{status_code: 204}} -> {:ok, "Domain deleted successfully"}
-      {:ok, %{status_code: status_code, body: body}} ->
-        case Jason.decode(body) do
-          {:ok, %{"message" => message}} -> {:error, message}
-          _ -> {:error, "Failed to delete domain (HTTP #{status_code})"}
-        end
-      {:error, reason} -> {:error, "Network error: #{reason}"}
+    # Call the domain store directly
+    case LoadBalancer.DomainStore.delete_domain(domain_name) do
+      {:ok, _} -> {:ok, "Domain deleted successfully"}
+      {:error, reason} -> {:error, reason}
     end
   end
 end
