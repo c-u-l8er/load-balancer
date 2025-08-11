@@ -10,42 +10,42 @@
     <link phx-track-static rel="stylesheet" href={~p"/assets/app.css"} />
     <script defer phx-track-static type="text/javascript" src={~p"/assets/app.js"}></script>
   </head>
-  <body class="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 antialiased">
-    <!-- Animated background particles -->
+  <body class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 antialiased">
+    <!-- Subtle animated background elements -->
     <div class="fixed inset-0 overflow-hidden pointer-events-none">
-      <div class="absolute -inset-[10px] opacity-50">
-        <div class="absolute top-1/4 left-1/4 w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-        <div class="absolute top-3/4 right-1/4 w-1 h-1 bg-purple-400 rounded-full animate-ping"></div>
-        <div class="absolute top-1/2 left-3/4 w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce"></div>
-        <div class="absolute top-1/3 right-1/3 w-1 h-1 bg-pink-400 rounded-full animate-pulse"></div>
+      <div class="absolute -inset-[10px] opacity-20">
+        <div class="absolute top-1/4 left-1/4 w-1 h-1 bg-blue-400 rounded-full animate-pulse"></div>
+        <div class="absolute top-3/4 right-1/4 w-0.5 h-0.5 bg-blue-300 rounded-full animate-ping"></div>
+        <div class="absolute top-1/2 left-3/4 w-1 h-1 bg-slate-400 rounded-full animate-bounce"></div>
+        <div class="absolute top-1/3 right-1/3 w-0.5 h-0.5 bg-slate-300 rounded-full animate-pulse"></div>
       </div>
     </div>
 
-    <header class="relative bg-gradient-to-r from-slate-800/90 via-purple-800/90 to-slate-800/90 backdrop-blur-sm border-b border-white/10 shadow-2xl">
+    <header class="relative bg-white/80 backdrop-blur-md border-b border-slate-200/60 shadow-sm">
       <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div class="flex h-20 items-center justify-between">
           <div class="flex items-center space-x-4">
             <div class="flex-shrink-0">
-              <div class="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+              <div class="w-12 h-12 bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg flex items-center justify-center shadow-md">
                 <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
                 </svg>
               </div>
             </div>
             <div>
-              <h1 class="text-2xl font-bold bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent">
+              <h1 class="text-2xl font-bold text-slate-900">
                 Load Balancer
               </h1>
-              <p class="text-sm text-gray-300">High-performance traffic distribution</p>
+              <p class="text-sm text-slate-600">Enterprise-grade traffic distribution</p>
             </div>
           </div>
           
           <!-- Navigation -->
           <nav class="hidden md:flex items-center space-x-8">
-            <a href="/dashboard" class="text-gray-300 hover:text-white transition-colors duration-200 font-medium">Dashboard</a>
-            <a href="/containers" class="text-gray-300 hover:text-white transition-colors duration-200 font-medium">Containers</a>
-            <a href="/domains" class="text-gray-300 hover:text-white transition-colors duration-200 font-medium">Domains</a>
-            <a href="/metrics" class="text-gray-300 hover:text-white transition-colors duration-200 font-medium">Metrics</a>
+            <a href="/dashboard" class="text-slate-600 hover:text-blue-600 transition-colors duration-200 font-medium">Dashboard</a>
+            <a href="/containers" class="text-slate-600 hover:text-blue-600 transition-colors duration-200 font-medium">Containers</a>
+            <a href="/domains" class="text-slate-600 hover:text-blue-600 transition-colors duration-200 font-medium">Domains</a>
+            <a href="/metrics" class="text-slate-600 hover:text-blue-600 transition-colors duration-200 font-medium">Metrics</a>
           </nav>
         </div>
       </div>
@@ -56,9 +56,9 @@
     </main>
 
     <!-- Footer -->
-    <footer class="relative mt-16 border-t border-white/10 bg-gradient-to-r from-slate-800/50 to-purple-800/50 backdrop-blur-sm">
+    <footer class="relative mt-16 border-t border-slate-200 bg-white/60 backdrop-blur-sm">
       <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
-        <div class="text-center text-gray-400">
+        <div class="text-center text-slate-500">
           <p>&copy; 2024 Load Balancer. Built with Phoenix LiveView & Tailwind CSS</p>
         </div>
       </div>

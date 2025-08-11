@@ -1,29 +1,29 @@
 [
   {
+    "status": "active",
+    "domain": "lb.local",
+    "strategy": "round_robin",
     "containers": [
       "load-balancer"
     ],
-    "domain": "lb.local",
-    "health_check": "/health",
-    "status": "active",
-    "strategy": "round_robin"
+    "health_check": "/health"
   },
   {
-    "containers": [
-      "myapp-nginx"
-    ],
+    "status": "active",
     "domain": "myapp.local",
-    "health_check": "/",
-    "status": "active",
-    "strategy": "round_robin"
-  },
-  {
+    "strategy": "round_robin",
     "containers": [
       "myapp-nginx"
     ],
-    "domain": "nginx.local",
-    "health_check": "/",
+    "health_check": "/"
+  },
+  {
     "status": "active",
-    "strategy": "round_robin"
+    "domain": "nginx.local",
+    "strategy": "round_robin",
+    "containers": [
+      "myapp-nginx"
+    ],
+    "health_check": "/"
   }
 ]

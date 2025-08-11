@@ -248,7 +248,7 @@ defmodule LoadBalancer.ContainerManager do
   defp get_docker_container_status(container_name) do
     # Use Docker CLI to get container status
     Logger.info("Getting Docker status for container: #{container_name}")
-    
+
     case System.cmd("docker", ["inspect", "--format", "{{.State.Status}}", container_name]) do
       {status, 0} ->
         status = String.trim(status)
@@ -296,7 +296,7 @@ defmodule LoadBalancer.ContainerManager do
       container ->
         # Map Docker status to our internal status
         Logger.info("Mapping Docker status for #{name}: #{docker_status}, health: #{docker_health}")
-        
+
         status = case docker_status do
           "running" ->
             case docker_health do
@@ -310,7 +310,7 @@ defmodule LoadBalancer.ContainerManager do
           "paused" -> :paused
           _ -> :unknown
         end
-        
+
         Logger.info("Mapped status for #{name}: #{docker_status} -> #{status}")
 
         updated_container = %{container |
