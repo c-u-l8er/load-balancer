@@ -17,7 +17,7 @@ config :load_balancer, LoadBalancerWeb.Endpoint,
     port: String.to_integer(System.get_env("LOAD_BALANCER_WEB_PORT") || "4000"),
     transport_options: [socket_opts: [:inet6]]
   ],
-  secret_key_base: "L47n8TRklPIz+kxPlZO9Ta6lukDTD9hOE/PvqqxJILEXvXlULPobBNYJSRXOAONE",
+  secret_key_base: System.get_env("SECRET_KEY_BASE") || "L47n8TRklPIz+kxPlZO9Ta6lukDTD9hOE/PvqqxJILEXvXlULPobBNYJSRXOAONE",
   live_view: [signing_salt: "zsAoodEZf6K3fZiNJt/5QrTFgSYJil/BjwxIX8O3Q1kp7xhBsyehDhOFt6I5S6w+"]
 
 # Configure the load balancer endpoint
@@ -27,8 +27,7 @@ config :load_balancer, LoadBalancer.Endpoint,
 # Configure logging
 config :logger,
   level: String.to_atom(System.get_env("LOAD_BALANCER_LOG_LEVEL") || "info"),
-  format: "$time $metadata[$level] $message\n",
-  metadata: [:request_id]
+  format: "$time [$level] $message\n"
 
 # Configure health check intervals
 config :load_balancer, LoadBalancer.ContainerManager,

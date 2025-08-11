@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  load-balancer:
+    build: .
+    container_name: load-balancer
+    ports:
+      - "8080:8080"  # Load balancer traffic port
+      - "4001:4001"  # Web management interface (mapped to 4001 to free 4000 for local dev)
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro  # Docker socket access
+      - ./certs:/etc/ssl/certs:ro  # SSL certificates
+      - ./config:/app/config:ro  # Configuration files
+    environment:
+      - LOAD_BALANCER_PORT=8080
+      - LOAD_BALANCER_WEB_PORT=4000
+      - LOAD_BALANCER_SSL_CERTS_PATH=/etc/ssl/certs
+      - LOAD_BALANCER_LOG_LEVEL=info
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - SECRET_KEY_BASE=GnxSXgDYykilzlTlmuLmg8kmeW+e7wvDvNKfIoHnLkDOfinAX1cuEeitZ4Ae3UJAhZZJim+Bws6Zen352o2fTQ==
+    networks:
+      - myapp-network  # Use your existing network
+      - load-balancer-network
+    restart: unless-stopped
+
+  # Example web application for testing (optional - you can use your existing nginx)
+  web-app-1:
+    image: nginx:alpine
+    container_name: web-app-1
+    ports:
+      - "8083:80"
+    volumes:
+      - ./examples/nginx-1.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - load-balancer-network
+    restart: unless-stopped
+
+  web-app-2:
+    image: nginx:alpine
+    container_name: web-app-2
+    ports:
+      - "8084:80"
+    volumes:
+      - ./examples/nginx-2.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - load-balancer-network
+    restart: unless-stopped
+
+volumes:
+  portainer_data:
+
+networks:
+  load-balancer-network:
+    driver: bridge
+  myapp-network:
+    external: true  # Use your existing network

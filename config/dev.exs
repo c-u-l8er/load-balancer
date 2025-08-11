@@ -27,8 +27,7 @@ config :load_balancer, LoadBalancer.Endpoint,
 # Configure logging for development
 config :logger,
   level: :debug,
-  format: "$time $metadata[$level] $message\n",
-  metadata: [:request_id]
+  format: "$time [$level] $message\n"
 
 # Configure health check intervals for development
 config :load_balancer, LoadBalancer.ContainerManager,

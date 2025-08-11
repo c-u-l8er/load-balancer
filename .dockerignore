@@ -1,0 +1,27 @@
+# Build artifacts
+_build/
+deps/
+
+# Git
+.git/
+.gitignore
+
+# Test files
+test/
+priv/test/
+
+# Development files (but keep prod.exs for production build)
+config/dev.exs
+config/test.exs
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.swp
+*~
+
+# OS generated files
+.DS_Store
+Thumbs.db

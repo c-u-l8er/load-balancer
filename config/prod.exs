@@ -13,10 +13,10 @@ config :load_balancer, LoadBalancerWeb.Endpoint,
   url: [host: System.get_env("PHX_HOST") || "localhost"],
   adapter: Phoenix.Endpoint.Cowboy2Adapter,
   http: [
-    port: String.to_integer(System.get_env("LOAD_BALANCER_WEB_PORT") || "4000"),
+    port: String.to_integer(System.get_env("LOAD_BALANCER_WEB_PORT") || "4001"),
     transport_options: [socket_opts: [:inet6]]
   ],
-  secret_key_base: System.get_env("SECRET_KEY_BASE"),
+  secret_key_base: System.get_env("SECRET_KEY_BASE") || "GnxSXgDYykilzlTlmuLmg8kmeW+e7wvDvNKfIoHnLkDOfinAX1cuEeitZ4Ae3UJAhZZJim+Bws6Zen352o2fTQ==",
   live_view: [signing_salt: System.get_env("LIVE_VIEW_SIGNING_SALT") || "production-signing-salt"],
   server: true,
   code_reloader: false,
@@ -29,8 +29,7 @@ config :load_balancer, LoadBalancer.Endpoint,
 # Configure logging for production
 config :logger,
   level: String.to_atom(System.get_env("LOAD_BALANCER_LOG_LEVEL") || "info"),
-  format: "$time $metadata[$level] $message\n",
-  metadata: [:request_id]
+  format: "$time [$level] $message\n"
 
 # Configure health check intervals for production
 config :load_balancer, LoadBalancer.ContainerManager,
