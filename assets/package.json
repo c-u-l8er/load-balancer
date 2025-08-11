@@ -3,9 +3,13 @@
   "version": "1.0.0",
   "description": "Assets for Load Balancer Phoenix application",
   "scripts": {
-    "build": "esbuild js/app.js --bundle --minify --target=es2017 --outdir=../priv/static/assets --external:/fonts/* --external:/images/* --external:phoenix --external:phoenix_live_view",
+    "build": "esbuild js/app.js --bundle --minify --target=es2017 --outdir=../priv/static/assets --external:/fonts/* --external:/images/*",
     "build:css": "tailwindcss -i ./css/app.css -o ../priv/static/assets/app.css --watch",
-    "build:js": "esbuild js/app.js --bundle --minify --target=es2017 --outdir=../priv/static/assets --external:/fonts/* --external:/images/* --external:phoenix --external:phoenix_live_view --watch"
+    "build:js": "esbuild js/app.js --bundle --minify --target=es2017 --outdir=../priv/static/assets --external:/fonts/* --external:/images/* --watch"
+  },
+  "dependencies": {
+    "phoenix": "^1.6.0",
+    "phoenix_live_view": "^0.19.0"
   },
   "devDependencies": {
     "esbuild": "^0.19.0",

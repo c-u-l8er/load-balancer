@@ -25,5 +25,12 @@ defmodule LoadBalancerWeb.Endpoint do
     gzip: false,
     only: ~w(assets fonts images favicon.ico robots.txt)
 
+  # LiveView socket handler
+  socket "/live", Phoenix.LiveView.Socket,
+    websocket: [
+      timeout: 45_000,
+      check_origin: false
+    ]
+
   plug LoadBalancerWeb.Router
 end

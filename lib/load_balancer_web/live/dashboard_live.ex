@@ -236,7 +236,16 @@ defmodule LoadBalancerWeb.DashboardLive do
     case HTTPoison.get("http://localhost:4000/api/routes") do
       {:ok, %{status_code: 200, body: body}} ->
         case Jason.decode(body) do
-          {:ok, %{"routes" => routes}} -> routes
+          {:ok, %{"routes" => routes}} ->
+            Enum.map(routes, fn route ->
+              %{
+                domain: route["domain"],
+                containers: route["containers"],
+                strategy: route["strategy"],
+                health_check: route["health_check"],
+                status: route["status"]
+              }
+            end)
           _ -> []
         end
       _ -> []
@@ -247,7 +256,15 @@ defmodule LoadBalancerWeb.DashboardLive do
     case HTTPoison.get("http://localhost:4000/api/containers") do
       {:ok, %{status_code: 200, body: body}} ->
         case Jason.decode(body) do
-          {:ok, %{"containers" => containers}} -> containers
+          {:ok, %{"containers" => containers}} ->
+            Enum.map(containers, fn container ->
+              %{
+                name: container["name"],
+                status: container["status"],
+                ports: container["ports"],
+                health: container["health"]
+              }
+            end)
           _ -> []
         end
       _ -> []
@@ -258,7 +275,15 @@ defmodule LoadBalancerWeb.DashboardLive do
     case HTTPoison.get("http://localhost:4000/api/metrics") do
       {:ok, %{status_code: 200, body: body}} ->
         case Jason.decode(body) do
-          {:ok, metrics} -> metrics
+          {:ok, metrics} ->
+            %{
+              response_time: metrics["response_time"] || 0,
+              error_rate: metrics["error_rate"] || 0,
+              throughput: metrics["throughput"] || 0,
+              active_connections: metrics["active_connections"] || 0,
+              containers: metrics["containers"] || %{},
+              domains: metrics["domains"] || %{}
+            }
           _ -> %{}
         end
       _ -> %{}

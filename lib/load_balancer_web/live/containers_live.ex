@@ -65,7 +65,7 @@ defmodule LoadBalancerWeb.ContainersLive do
               </svg>
             </div>
             <div class="text-2xl font-bold text-white">
-              <%= @containers |> Enum.filter(&(&1.health == "healthy")) |> length() %>
+              <%= @containers |> Enum.filter(&(&1["health"] == "healthy")) |> length() %>
             </div>
             <div class="text-sm text-gray-300">Healthy</div>
           </div>
@@ -77,7 +77,7 @@ defmodule LoadBalancerWeb.ContainersLive do
               </svg>
             </div>
             <div class="text-2xl font-bold text-white">
-              <%= @containers |> Enum.filter(&(&1.health == "unknown")) |> length() %>
+              <%= @containers |> Enum.filter(&(&1["health"] == "unknown")) |> length() %>
             </div>
             <div class="text-sm text-gray-300">Unknown</div>
           </div>
@@ -89,7 +89,7 @@ defmodule LoadBalancerWeb.ContainersLive do
               </svg>
             </div>
             <div class="text-2xl font-bold text-white">
-              <%= @containers |> Enum.filter(&(&1.health == "unhealthy")) |> length() %>
+              <%= @containers |> Enum.filter(&(&1["health"] == "unhealthy")) |> length() %>
             </div>
             <div class="text-sm text-gray-300">Unhealthy</div>
           </div>
@@ -137,13 +137,13 @@ defmodule LoadBalancerWeb.ContainersLive do
                       <div class="flex items-center space-x-3">
                         <div class={[
                           "w-3 h-3 rounded-full",
-                          case container.health do
+                          case container["health"] do
                             "healthy" -> "bg-green-400"
                             "unhealthy" -> "bg-red-400"
                             _ -> "bg-yellow-400"
                           end
                         ]}></div>
-                        <h4 class="text-lg font-semibold text-white"><%= container.name %></h4>
+                        <h4 class="text-lg font-semibold text-white"><%= container["name"] %></h4>
                       </div>
                       <div class="flex space-x-2">
                         <button class="p-2 text-gray-400 hover:text-white transition-colors">
@@ -164,24 +164,24 @@ defmodule LoadBalancerWeb.ContainersLive do
                         <span class="text-sm text-gray-400">Status</span>
                         <span class={[
                           "px-2 py-1 rounded-full text-xs font-medium",
-                          case container.health do
+                          case container["health"] do
                             "healthy" -> "bg-green-500/20 text-green-400"
                             "unhealthy" -> "bg-red-500/20 text-red-400"
                             _ -> "bg-yellow-500/20 text-yellow-400"
                           end
                         ]}>
-                          <%= container.health %>
+                          <%= container["health"] %>
                         </span>
                       </div>
 
                       <div class="flex items-center justify-between">
                         <span class="text-sm text-gray-400">Ports</span>
-                        <span class="text-sm text-white font-mono"><%= container.ports %></span>
+                        <span class="text-sm text-white font-mono"><%= container["ports"] %></span>
                       </div>
 
                       <div class="flex items-center justify-between">
                         <span class="text-sm text-gray-400">State</span>
-                        <span class="text-sm text-white"><%= container.status %></span>
+                        <span class="text-sm text-white"><%= container["status"] %></span>
                       </div>
                     </div>
 

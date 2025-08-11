@@ -1,4 +1,5 @@
 // Phoenix LiveView JavaScript
+// Phoenix LiveView JavaScript
 import { LiveSocket } from "phoenix_live_view"
 import { Socket } from "phoenix"
 

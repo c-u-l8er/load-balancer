@@ -255,7 +255,16 @@ defmodule LoadBalancerWeb.DomainsLive do
     case HTTPoison.get("http://localhost:4000/api/routes") do
       {:ok, %{status_code: 200, body: body}} ->
         case Jason.decode(body) do
-          {:ok, %{"routes" => routes}} -> routes
+          {:ok, %{"routes" => routes}} ->
+            Enum.map(routes, fn route ->
+              %{
+                domain: route["domain"],
+                containers: route["containers"],
+                strategy: route["strategy"],
+                health_check: route["health_check"],
+                status: route["status"]
+              }
+            end)
           _ -> []
         end
       _ -> []
