@@ -3,7 +3,7 @@ import Config
 
 # Configure the load balancer for development
 config :load_balancer,
-  load_balancer_port: 8080,
+  load_balancer_port: 8081,
   load_balancer_web_port: 4000,
   ssl_certs_path: "priv/certs",
   log_level: :debug
@@ -22,7 +22,7 @@ config :load_balancer, LoadBalancerWeb.Endpoint,
 
 # Configure the load balancer endpoint for development
 config :load_balancer, LoadBalancer.Endpoint,
-  port: 8080
+  port: 8081
 
 # Configure logging for development
 config :logger,
@@ -68,3 +68,9 @@ config :load_balancer, LoadBalancer.SessionManager,
 config :load_balancer, LoadBalancer.Failover,
   default_health_check_path: "/health",
   default_failover_delay: 5000
+
+# Configure esbuild version
+config :esbuild, :version, "0.25.0"
+
+# Configure tailwind version
+config :tailwind, :version, "3.4.6"

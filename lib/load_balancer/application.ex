@@ -24,7 +24,7 @@ defmodule LoadBalancer.Application do
       LoadBalancer.HealthChecker,
 
       # HTTP server for the load balancer
-      {Plug.Cowboy, scheme: :http, plug: LoadBalancer.Endpoint, options: [port: 8080]},
+      {Plug.Cowboy, scheme: :http, plug: LoadBalancer.Endpoint, options: [port: Application.get_env(:load_balancer, :load_balancer_port)]},
 
       # Phoenix endpoint for management interface
       LoadBalancerWeb.Endpoint
@@ -38,7 +38,7 @@ defmodule LoadBalancer.Application do
         {:ok, pid}
 
       {:error, reason} ->
-        Logger.error("Failed to start LoadBalancer Application: #{reason}")
+        Logger.error("Failed to start LoadBalancer Application: #{inspect(reason)}")
         {:error, reason}
     end
   end
