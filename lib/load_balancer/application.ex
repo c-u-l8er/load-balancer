@@ -11,11 +11,20 @@ defmodule LoadBalancer.Application do
   def start(_type, _args) do
     Logger.info("Starting LoadBalancer Application...")
 
-          # Initialize ETS tables for strategies
-      LoadBalancer.Strategy.init()
+    # Initialize ETS tables for strategies
+    LoadBalancer.Strategy.init()
 
-      # Initialize load balancer configuration
-      LoadBalancer.Config.init()
+    # Initialize load balancer configuration
+    LoadBalancer.Config.init()
+
+    # Initialize domain store
+    LoadBalancer.DomainStore.init()
+
+    # Load persisted domains from file
+    LoadBalancer.DomainPersistence.load_domains()
+
+    # Start auto-saving domains every 30 seconds
+    LoadBalancer.DomainPersistence.start_auto_save(30)
 
     children = [
       # Core load balancer services (GenServer processes)
@@ -46,6 +55,13 @@ defmodule LoadBalancer.Application do
   @impl Application
   def stop(_state) do
     Logger.info("Stopping LoadBalancer Application...")
+
+    # Save domains before shutting down
+    case LoadBalancer.DomainPersistence.save_domains() do
+      {:ok, count} -> Logger.info("Saved #{count} domains before shutdown")
+      {:error, reason} -> Logger.error("Failed to save domains on shutdown: #{reason}")
+    end
+
     :ok
   end
 end

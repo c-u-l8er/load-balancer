@@ -8,47 +8,73 @@ defmodule LoadBalancerWeb.ApiController do
       _ -> []
     end
 
-    # Also include our configured domains from config files
-    configured_domains = [
-      %{
-        domain: "myapp.local",
-        containers: ["myapp-nginx"],
-        strategy: "round_robin",
-        health_check: "/",
-        status: "active"
-      },
-      %{
-        domain: "nginx.local",
-        containers: ["myapp-nginx"],
-        strategy: "round_robin",
-        health_check: "/",
-        status: "active"
-      },
-      %{
-        domain: "lb.local",
-        containers: ["load-balancer"],
-        strategy: "round_robin",
-        health_check: "/health",
-        status: "active"
-      }
-    ]
+    # Get configured domains from the domain store
+    configured_domains = LoadBalancer.DomainStore.get_all_domains()
 
     json(conn, %{routes: configured_domains})
   end
 
-  def create_route(conn, _params) do
-    # Placeholder for route creation
-    json(conn, %{message: "Route creation not implemented yet"})
+  def create_route(conn, params) do
+    # Extract domain data from params
+    domain_data = %{
+      domain: params["domain"],
+      containers: params["containers"],
+      strategy: params["strategy"],
+      health_check: params["health_check"],
+      status: params["status"]
+    }
+
+    # Use the domain store to create the domain
+    case LoadBalancer.DomainStore.add_domain(domain_data) do
+      {:ok, domain} ->
+        conn
+        |> put_status(:created)
+        |> json(%{message: "Domain created successfully", domain: domain})
+      
+      {:error, message} ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{error: message})
+    end
   end
 
-  def update_route(conn, %{"domain" => domain}) do
-    # Placeholder for route update
-    json(conn, %{message: "Route update not implemented yet", domain: domain})
+  def update_route(conn, %{"domain" => old_domain} = params) do
+    # Extract updated domain data
+    domain_data = %{
+      domain: params["domain"],
+      containers: params["containers"],
+      strategy: params["strategy"],
+      health_check: params["health_check"],
+      status: params["status"]
+    }
+
+    # Use the domain store to update the domain
+    case LoadBalancer.DomainStore.update_domain(old_domain, domain_data) do
+      {:ok, domain} ->
+        conn
+        |> put_status(:ok)
+        |> json(%{message: "Domain updated successfully", domain: domain})
+      
+      {:error, message} ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{error: message})
+    end
   end
 
   def delete_route(conn, %{"domain" => domain}) do
-    # Placeholder for route deletion
-    json(conn, %{message: "Route deletion not implemented yet", domain: domain})
+    # Use the domain store to delete the domain
+    case LoadBalancer.DomainStore.delete_domain(domain) do
+      {:ok, domain_name} ->
+        conn
+        |> put_status(:ok)
+        |> json(%{message: "Domain deleted successfully", domain: domain_name})
+      
+      {:error, message} ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: message})
+    end
   end
 
   def get_containers(conn, _params) do
@@ -154,5 +180,33 @@ defmodule LoadBalancerWeb.ApiController do
         health_status: "healthy"
       }
     }
+  end
+
+  defp validate_domain_data(domain_data) do
+    cond do
+      is_nil(domain_data.domain) or domain_data.domain == "" ->
+        {:error, "Domain name is required"}
+      
+      is_nil(domain_data.containers) or domain_data.containers == [] ->
+        {:error, "At least one container is required"}
+      
+      is_nil(domain_data.strategy) or domain_data.strategy == "" ->
+        {:error, "Load balancing strategy is required"}
+      
+      is_nil(domain_data.health_check) or domain_data.health_check == "" ->
+        {:error, "Health check path is required"}
+      
+      is_nil(domain_data.status) or domain_data.status == "" ->
+        {:error, "Status is required"}
+      
+      not Enum.member?(["round_robin", "least_connections", "ip_hash", "weighted_round_robin"], domain_data.strategy) ->
+        {:error, "Invalid load balancing strategy"}
+      
+      not Enum.member?(["active", "inactive", "maintenance"], domain_data.status) ->
+        {:error, "Invalid status value"}
+      
+      true ->
+        :ok
+    end
   end
 end

@@ -1,5 +1,6 @@
 defmodule LoadBalancerWeb.DomainsLive do
   use LoadBalancerWeb, :live_view
+  require Logger
 
   def mount(_params, _session, socket) do
     if connected?(socket) do
@@ -12,13 +13,178 @@ defmodule LoadBalancerWeb.DomainsLive do
     {:ok, assign(socket,
       page_title: "Domains",
       domains: [],
-      loading: true
+      loading: true,
+      show_add_form: false,
+      show_edit_form: false,
+      editing_domain: nil,
+      form_data: %{
+        domain: "",
+        containers: "",
+        strategy: "round_robin",
+        health_check: "/",
+        status: "active"
+      }
     )}
   end
 
   def handle_info(:update_domains, socket) do
     domains = fetch_domains()
     {:noreply, assign(socket, domains: domains, loading: false)}
+  end
+
+  # Event handlers for domain management
+  def handle_event("show_add_form", _params, socket) do
+    {:noreply, assign(socket, show_add_form: true, show_edit_form: false)}
+  end
+
+  def handle_event("hide_add_form", _params, socket) do
+    {:noreply, assign(socket, show_add_form: false, form_data: %{
+      domain: "",
+      containers: "",
+      strategy: "round_robin",
+      health_check: "/",
+      status: "active"
+    })}
+  end
+
+  def handle_event("show_edit_form", %{"domain" => domain_name}, socket) do
+    domain = Enum.find(socket.assigns.domains, &(&1.domain == domain_name))
+    if domain do
+      form_data = %{
+        domain: domain.domain,
+        containers: Enum.join(domain.containers, ","),
+        strategy: domain.strategy,
+        health_check: domain.health_check,
+        status: domain.status
+      }
+      {:noreply, assign(socket,
+        show_edit_form: true,
+        show_add_form: false,
+        editing_domain: domain,
+        form_data: form_data
+      )}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_event("hide_edit_form", _params, socket) do
+    {:noreply, assign(socket, show_edit_form: false, editing_domain: nil)}
+  end
+
+
+
+  def handle_event("add_domain", params, socket) do
+    # Extract form data from params
+    form_data = %{
+      "domain" => params["form_data"]["domain"],
+      "containers" => params["form_data"]["containers"],
+      "strategy" => params["form_data"]["strategy"],
+      "health_check" => params["form_data"]["health_check"],
+      "status" => params["form_data"]["status"]
+    }
+
+    # Basic validation
+    cond do
+      form_data["domain"] == "" ->
+        {:noreply, put_flash(socket, :error, "Domain name is required")}
+
+      form_data["containers"] == "" ->
+        {:noreply, put_flash(socket, :error, "At least one container is required")}
+
+      form_data["health_check"] == "" ->
+        {:noreply, put_flash(socket, :error, "Health check path is required")}
+
+      true ->
+                         case create_domain(form_data) do
+                   {:ok, _} ->
+                     domains = fetch_domains()
+                     # Auto-save domains to disk
+                     LoadBalancer.DomainPersistence.save_domains()
+                     {:noreply, assign(socket,
+                       domains: domains,
+                       show_add_form: false,
+                       form_data: %{
+                         domain: "",
+                         containers: "",
+                         strategy: "round_robin",
+                         health_check: "/",
+                         status: "active"
+                       }
+                     ) |> put_flash(:info, "Domain created successfully")}
+                   {:error, message} ->
+                     {:noreply, put_flash(socket, :error, "Failed to create domain: #{message}")}
+                 end
+    end
+  end
+
+  def handle_event("update_domain", params, socket) do
+    # Extract form data from params
+    form_data = %{
+      "domain" => params["form_data"]["domain"],
+      "containers" => params["form_data"]["containers"],
+      "strategy" => params["form_data"]["strategy"],
+      "health_check" => params["form_data"]["health_check"],
+      "status" => params["form_data"]["status"]
+    }
+
+    # Basic validation
+    cond do
+      form_data["domain"] == "" ->
+        {:noreply, put_flash(socket, :error, "Domain name is required")}
+
+      form_data["containers"] == "" ->
+        {:noreply, put_flash(socket, :error, "At least one container is required")}
+
+      form_data["health_check"] == "" ->
+        {:noreply, put_flash(socket, :error, "Health check path is required")}
+
+      true ->
+                         case update_domain(socket.assigns.editing_domain.domain, form_data) do
+                   {:ok, _} ->
+                     domains = fetch_domains()
+                     # Auto-save domains to disk
+                     LoadBalancer.DomainPersistence.save_domains()
+                     {:noreply, assign(socket,
+                       domains: domains,
+                       show_edit_form: false,
+                       editing_domain: nil
+                     ) |> put_flash(:info, "Domain updated successfully")}
+                   {:error, message} ->
+                     {:noreply, put_flash(socket, :error, "Failed to update domain: #{message}")}
+                 end
+    end
+  end
+
+  def handle_event("delete_domain", %{"domain" => domain_name}, socket) do
+    case delete_domain(domain_name) do
+      {:ok, _} ->
+        domains = fetch_domains()
+        # Auto-save domains to disk
+        LoadBalancer.DomainPersistence.save_domains()
+        {:noreply, put_flash(socket, :info, "Domain deleted successfully")}
+      {:error, message} ->
+        {:noreply, put_flash(socket, :error, "Failed to delete domain: #{message}")}
+    end
+  end
+
+  def handle_event("save_domains", _params, socket) do
+    case LoadBalancer.DomainPersistence.save_domains() do
+      {:ok, count} ->
+        {:noreply, put_flash(socket, :info, "Successfully saved #{count} domains to disk")}
+      {:error, message} ->
+        {:noreply, put_flash(socket, :error, "Failed to save domains: #{message}")}
+    end
+  end
+
+  def handle_event("reload_domains", _params, socket) do
+    case LoadBalancer.DomainPersistence.load_domains() do
+      {:ok, count} ->
+        domains = fetch_domains()
+        {:noreply, assign(socket, domains: domains) |> put_flash(:info, "Successfully reloaded #{count} domains from disk")}
+      {:error, message} ->
+        {:noreply, put_flash(socket, :error, "Failed to reload domains: #{message}")}
+    end
   end
 
   def render(assigns) do
@@ -33,6 +199,19 @@ defmodule LoadBalancerWeb.DomainsLive do
           Configure and manage your load balancer routes and domain mappings
         </p>
       </div>
+
+      <!-- Flash Messages -->
+      <%= if live_flash(@flash, :info) do %>
+        <div class="bg-green-500/20 border border-green-500/30 rounded-lg p-4 text-green-400">
+          <%= live_flash(@flash, :info) %>
+        </div>
+      <% end %>
+
+      <%= if live_flash(@flash, :error) do %>
+        <div class="bg-red-500/20 border border-red-500/30 rounded-lg p-4 text-red-400">
+          <%= live_flash(@flash, :error) %>
+        </div>
+      <% end %>
 
       <!-- Loading State -->
       <%= if @loading do %>
@@ -111,9 +290,17 @@ defmodule LoadBalancerWeb.DomainsLive do
                   <p class="text-gray-300">Manage your load balancer domain configurations</p>
                 </div>
               </div>
-              <button class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium py-3 px-6 rounded-xl transition-all duration-200 hover:scale-105 hover:shadow-lg">
-                Add Domain
-              </button>
+              <div class="flex space-x-3">
+                <button phx-click="save_domains" class="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-medium py-3 px-6 rounded-xl transition-all duration-200 hover:scale-105 hover:shadow-lg">
+                  Save to Disk
+                </button>
+                <button phx-click="reload_domains" class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium py-3 px-6 rounded-xl transition-all duration-200 hover:scale-105 hover:shadow-lg">
+                  Reload from Disk
+                </button>
+                <button phx-click="show_add_form" class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium py-3 px-6 rounded-xl transition-all duration-200 hover:scale-105 hover:shadow-lg">
+                  Add Domain
+                </button>
+              </div>
             </div>
 
             <!-- Domain List -->
@@ -142,12 +329,12 @@ defmodule LoadBalancerWeb.DomainsLive do
                         <h4 class="text-lg font-semibold text-white"><%= domain.domain %></h4>
                       </div>
                       <div class="flex space-x-2">
-                        <button class="p-2 text-gray-400 hover:text-white transition-colors">
+                        <button phx-click="show_edit_form" phx-value-domain={domain.domain} class="p-2 text-gray-400 hover:text-white transition-colors" title="Edit Domain">
                           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
                           </svg>
                         </button>
-                        <button class="p-2 text-gray-400 hover:text-white transition-colors">
+                        <button phx-click="delete_domain" phx-value-domain={domain.domain} class="p-2 text-gray-400 hover:text-red-400 transition-colors" title="Delete Domain">
                           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                           </svg>
@@ -212,6 +399,158 @@ defmodule LoadBalancerWeb.DomainsLive do
           </div>
         </div>
 
+        <!-- Add Domain Form -->
+        <%= if @show_add_form do %>
+          <div class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+            <div class="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-8 max-w-md w-full mx-4">
+              <div class="flex items-center justify-between mb-6">
+                <div class="flex items-center space-x-3">
+                  <div class="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                    </svg>
+                  </div>
+                  <h3 class="text-2xl font-bold text-white">Add New Domain</h3>
+                </div>
+                <button phx-click="hide_add_form" class="text-gray-400 hover:text-white transition-colors">
+                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                  </svg>
+                </button>
+              </div>
+
+              <form phx-submit="add_domain" class="space-y-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-300 mb-2">Domain Name</label>
+                  <input type="text" name="form_data[domain]" value={@form_data.domain} required
+                         class="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                         placeholder="example.com" />
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-gray-300 mb-2">Containers (comma-separated)</label>
+                  <input type="text" name="form_data[containers]" value={@form_data.containers} required
+                         class="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                         placeholder="web1:8080,web2:8080" />
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-gray-300 mb-2">Load Balancing Strategy</label>
+                  <select name="form_data[strategy]" value={@form_data.strategy}
+                          class="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                    <option value="round_robin">Round Robin</option>
+                    <option value="least_connections">Least Connections</option>
+                    <option value="ip_hash">IP Hash</option>
+                    <option value="weighted_round_robin">Weighted Round Robin</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-gray-300 mb-2">Health Check Path</label>
+                  <input type="text" name="form_data[health_check]" value={@form_data.health_check} required
+                         class="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                         placeholder="/health" />
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-gray-300 mb-2">Status</label>
+                  <select name="form_data[status]" value={@form_data.status}
+                          class="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                    <option value="maintenance">Maintenance</option>
+                  </select>
+                </div>
+
+                <div class="flex space-x-3 pt-4">
+                  <button type="submit" class="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 hover:scale-105">
+                    Add Domain
+                  </button>
+                  <button type="button" phx-click="hide_add_form" class="flex-1 bg-white/10 hover:bg-white/20 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200">
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        <% end %>
+
+        <!-- Edit Domain Form -->
+        <%= if @show_edit_form do %>
+          <div class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+            <div class="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-8 max-w-md w-full mx-4">
+              <div class="flex items-center justify-between mb-6">
+                <div class="flex items-center space-x-3">
+                  <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.045a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+                    </svg>
+                  </div>
+                  <h3 class="text-2xl font-bold text-white">Edit Domain: <%= @editing_domain.domain %></h3>
+                </div>
+                <button phx-click="hide_edit_form" class="text-gray-400 hover:text-white transition-colors">
+                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                  </svg>
+                </button>
+              </div>
+
+              <form phx-submit="update_domain" class="space-y-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-300 mb-2">Domain Name</label>
+                  <input type="text" name="form_data[domain]" value={@form_data.domain} required
+                         class="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                         placeholder="example.com" />
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-gray-300 mb-2">Containers (comma-separated)</label>
+                  <input type="text" name="form_data[containers]" value={@form_data.containers} required
+                         class="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                         placeholder="web1:8080,web2:8080" />
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-gray-300 mb-2">Load Balancing Strategy</label>
+                  <select name="form_data[strategy]" value={@form_data.strategy}
+                          class="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                    <option value="round_robin">Round Robin</option>
+                    <option value="least_connections">Least Connections</option>
+                    <option value="ip_hash">IP Hash</option>
+                    <option value="weighted_round_robin">Weighted Round Robin</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-gray-300 mb-2">Health Check Path</label>
+                  <input type="text" name="form_data[health_check]" value={@form_data.health_check} required
+                         class="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                         placeholder="/health" />
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-gray-300 mb-2">Status</label>
+                  <select name="form_data[status]" value={@form_data.status}
+                          class="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                    <option value="maintenance">Maintenance</option>
+                  </select>
+                </div>
+
+                <div class="flex space-x-3 pt-4">
+                  <button type="submit" class="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 hover:scale-105">
+                    Update Domain
+                  </button>
+                  <button type="button" phx-click="hide_edit_form" class="flex-1 bg-white/10 hover:bg-white/20 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200">
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        <% end %>
+
         <!-- Quick Actions -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div class="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-6 hover:bg-white/10 transition-all duration-300">
@@ -268,6 +607,70 @@ defmodule LoadBalancerWeb.DomainsLive do
           _ -> []
         end
       _ -> []
+    end
+  end
+
+  defp create_domain(form_data) do
+    containers = form_data["containers"]
+    |> String.split(",")
+    |> Enum.map(&String.trim/1)
+    |> Enum.filter(&(&1 != ""))
+
+    domain_data = %{
+      domain: form_data["domain"],
+      containers: containers,
+      strategy: form_data["strategy"],
+      health_check: form_data["health_check"],
+      status: form_data["status"]
+    }
+
+    case HTTPoison.post("http://localhost:4000/api/routes", Jason.encode!(domain_data), [{"Content-Type", "application/json"}]) do
+      {:ok, %{status_code: 201}} -> {:ok, "Domain created successfully"}
+      {:ok, %{status_code: 200}} -> {:ok, "Domain created successfully"}
+      {:ok, %{status_code: status_code, body: body}} ->
+        case Jason.decode(body) do
+          {:ok, %{"message" => message}} -> {:error, message}
+          _ -> {:error, "Failed to create domain (HTTP #{status_code})"}
+        end
+      {:error, reason} -> {:error, "Network error: #{reason}"}
+    end
+  end
+
+  defp update_domain(domain_name, form_data) do
+    containers = form_data["containers"]
+    |> String.split(",")
+    |> Enum.map(&String.trim/1)
+    |> Enum.filter(&(&1 != ""))
+
+    domain_data = %{
+      domain: form_data["domain"],
+      containers: containers,
+      strategy: form_data["strategy"],
+      health_check: form_data["health_check"],
+      status: form_data["status"]
+    }
+
+    case HTTPoison.put("http://localhost:4000/api/routes/#{domain_name}", Jason.encode!(domain_data), [{"Content-Type", "application/json"}]) do
+      {:ok, %{status_code: 200}} -> {:ok, "Domain updated successfully"}
+      {:ok, %{status_code: status_code, body: body}} ->
+        case Jason.decode(body) do
+          {:ok, %{"message" => message}} -> {:error, message}
+          _ -> {:error, "Failed to update domain (HTTP #{status_code})"}
+        end
+      {:error, reason} -> {:error, "Network error: #{reason}"}
+    end
+  end
+
+  defp delete_domain(domain_name) do
+    case HTTPoison.delete("http://localhost:4000/api/routes/#{domain_name}") do
+      {:ok, %{status_code: 200}} -> {:ok, "Domain deleted successfully"}
+      {:ok, %{status_code: 204}} -> {:ok, "Domain deleted successfully"}
+      {:ok, %{status_code: status_code, body: body}} ->
+        case Jason.decode(body) do
+          {:ok, %{"message" => message}} -> {:error, message}
+          _ -> {:error, "Failed to delete domain (HTTP #{status_code})"}
+        end
+      {:error, reason} -> {:error, "Network error: #{reason}"}
     end
   end
 end
