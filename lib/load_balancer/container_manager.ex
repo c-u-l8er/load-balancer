@@ -359,6 +359,15 @@ defmodule LoadBalancer.ContainerManager do
         last_health_check: nil,
         connection_count: 0,
         metadata: %{}
+      },
+      "myapp-nginx" => %Container{
+        name: "myapp-nginx",
+        endpoint: "http://172.19.0.3:80",
+        status: :starting,
+        health_check_url: "http://172.19.0.3:80", # Keep for compatibility
+        last_health_check: nil,
+        connection_count: 0,
+        metadata: %{}
       }
     }
 

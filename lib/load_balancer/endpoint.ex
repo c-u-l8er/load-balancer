@@ -71,16 +71,24 @@ defmodule LoadBalancer.Endpoint do
     # Build target URL
     target_url = build_target_url(container_endpoint, conn.request_path, conn.query_string)
 
+    # Filter and clean headers to ensure they can be serialized
+    clean_headers = Enum.filter(conn.req_headers, fn {key, value} ->
+      is_binary(key) and is_binary(value)
+    end)
+
+    # Debug: log the headers being sent
+    Logger.debug("Sending headers to container: #{inspect(clean_headers)}")
+
     # Prepare request options
     opts = [
       method: String.to_atom(conn.method),
-      headers: conn.req_headers,
+      headers: clean_headers,
       body: get_request_body(conn),
       timeout: 30_000
     ]
 
     # Make request to container
-    case HTTPoison.request(opts[:method], target_url, opts[:body], opts[:headers], opts) do
+    case HTTPoison.request(opts[:method], target_url, opts[:body], opts[:headers], [timeout: opts[:timeout]]) do
       {:ok, %{status_code: status_code, headers: headers, body: body}} ->
         # Forward response back to client
         conn
@@ -100,8 +108,13 @@ defmodule LoadBalancer.Endpoint do
   end
 
   defp get_request_body(conn) do
-    case conn.body_params do
-      %{} = params -> Jason.encode!(params)
+    try do
+      case conn.body_params do
+        %{} = params -> Jason.encode!(params)
+        %Plug.Conn.Unfetched{} -> ""
+        _ -> ""
+      end
+    rescue
       _ -> ""
     end
   end

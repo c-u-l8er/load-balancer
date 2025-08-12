@@ -58,13 +58,20 @@ defmodule LoadBalancer.DomainPersistence do
 
             # Load each domain
             loaded_count = Enum.reduce_while(domains, 0, fn domain_data, count ->
-                               case LoadBalancer.DomainStore.add_domain(domain_data) do
-                   {:ok, _domain} ->
-                     {:cont, count + 1}
-                 {:error, reason} ->
-                   Logger.warn("Failed to load domain #{domain_data["domain"]}: #{reason}")
-                   {:cont, count}
-               end
+              case LoadBalancer.DomainStore.add_domain(domain_data) do
+                {:ok, _domain} ->
+                  # Also register the domain with the router
+                  case LoadBalancer.Router.register_domain_with_config(domain_data["domain"], domain_data) do
+                    :ok ->
+                      Logger.info("Registered domain #{domain_data["domain"]} with router")
+                    {:error, reason} ->
+                      Logger.warn("Failed to register domain #{domain_data["domain"]} with router: #{reason}")
+                  end
+                  {:cont, count + 1}
+                {:error, reason} ->
+                  Logger.warn("Failed to load domain #{domain_data["domain"]}: #{reason}")
+                  {:cont, count}
+              end
             end)
 
             Logger.info("Loaded #{loaded_count} domains from #{@data_file}")

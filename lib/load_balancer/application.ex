@@ -20,12 +20,6 @@ defmodule LoadBalancer.Application do
     # Initialize domain store
     LoadBalancer.DomainStore.init()
 
-    # Load persisted domains from file
-    LoadBalancer.DomainPersistence.load_domains()
-
-    # Start auto-saving domains every 30 seconds
-    LoadBalancer.DomainPersistence.start_auto_save(30)
-
     children = [
       # Core load balancer services (GenServer processes)
       LoadBalancer.Router,
@@ -44,6 +38,16 @@ defmodule LoadBalancer.Application do
     case Supervisor.start_link(children, opts) do
       {:ok, pid} ->
         Logger.info("LoadBalancer Application started successfully")
+        
+        # Now that the supervisor is running, load persisted domains and register them with the router
+        case LoadBalancer.DomainPersistence.load_domains() do
+          {:ok, count} -> Logger.info("Loaded #{count} domains from persistence")
+          {:error, reason} -> Logger.error("Failed to load domains: #{reason}")
+        end
+        
+        # Start auto-saving domains every 30 seconds
+        LoadBalancer.DomainPersistence.start_auto_save(30)
+        
         {:ok, pid}
 
       {:error, reason} ->

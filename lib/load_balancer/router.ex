@@ -33,6 +33,13 @@ defmodule LoadBalancer.Router do
   end
 
   @doc """
+  Registers a domain with the router using existing configuration.
+  """
+  def register_domain_with_config(domain, config) do
+    GenServer.call(__MODULE__, {:register_domain_with_config, domain, config})
+  end
+
+  @doc """
   Routes a request to the appropriate container based on domain.
   """
   def route_request(domain, path, headers \\ %{}) do
@@ -70,6 +77,37 @@ defmodule LoadBalancer.Router do
         containers: [],
         strategy: :round_robin,
         health_checks: [],
+        ssl: nil,
+        rate_limits: nil,
+        sticky_sessions: nil,
+        circuit_breaker: nil,
+        monitoring: nil,
+        auto_scaling: nil,
+        failover: nil
+      })
+    }
+
+    {:reply, :ok, new_state}
+  end
+
+  @impl GenServer
+  def handle_call({:register_domain_with_config, domain, config}, _from, state) do
+    Logger.info("Registering domain with config: #{domain}")
+
+    # Convert string keys to atoms for strategy
+    strategy = case config["strategy"] || config[:strategy] do
+      "round_robin" -> :round_robin
+      "least_connections" -> :least_connections
+      "ip_hash" -> :ip_hash
+      "weighted_round_robin" -> :weighted_round_robin
+      _ -> :round_robin
+    end
+
+    new_state = %{state |
+      domains: Map.put(state.domains, domain, %{
+        containers: config["containers"] || config[:containers] || [],
+        strategy: strategy,
+        health_checks: [config["health_check"] || config[:health_check] || "/"],
         ssl: nil,
         rate_limits: nil,
         sticky_sessions: nil,
