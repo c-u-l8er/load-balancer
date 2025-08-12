@@ -1,6 +1,15 @@
 [
   {
     "status": "active",
+    "domain": "brokenrecord.studio",
+    "strategy": "round_robin",
+    "containers": [
+      "myapp-nginx"
+    ],
+    "health_check": "/"
+  },
+  {
+    "status": "active",
     "domain": "lb.local",
     "strategy": "round_robin",
     "containers": [
